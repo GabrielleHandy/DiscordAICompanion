@@ -1,0 +1,9 @@
+{
+  "Name": "Discord AI Companion Bridge",
+  "Author": "Gabrielle",
+  "Version": "1.0.0",
+  "Description": "Bridges Stardew player states to a local Node.js AI bot.",
+  "UniqueID": "Gabrielle.DiscordAICompanion",
+  "EntryDll": "DiscordAICompanion.dll",
+  "MinimumApiVersion": "4.0.0"
+}
