@@ -1,9 +1,9 @@
 {
-  "Name": "Discord AI Companion Bridge",
+  "Name": "ACORN Bridge",
   "Author": "Gabrielle",
   "Version": "1.0.0",
-  "Description": "Bridges Stardew player states to a local Node.js AI bot.",
-  "UniqueID": "Gabrielle.DiscordAICompanion",
+  "Description": "Autonomous Co-Op Rural Network - Bridges live player states to your local AI companion.",
+  "UniqueID": "Gabrielle.ACORNBridge",
   "EntryDll": "DiscordAICompanion.dll",
   "MinimumApiVersion": "4.0.0"
 }

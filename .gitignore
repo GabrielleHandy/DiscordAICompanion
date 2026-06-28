@@ -18,3 +18,4 @@ DiscordAICompanion/
 *.userosscache
 *.sln.docstates
 .vs/
+node_modules

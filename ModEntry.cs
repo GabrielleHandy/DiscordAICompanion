@@ -1,52 +1,95 @@
-using System;
-using System.Net.Http;
 using System.Text;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Pathfinding; // Added for PathFindController
+using Microsoft.Xna.Framework;
 
 namespace DiscordAICompanion
 {
     public class ModEntry : Mod
     {
         private static readonly HttpClient client = new HttpClient();
-        private const string NodeServerUrl = "http://localhost:3000/api/stardew-update";
+        private const string NodeServerUrl = "http://localhost:3000/api/town-override";
 
         public override void Entry(IModHelper helper)
         {
-            // Hook into the game clock ticking (runs every 10 in-game minutes)
-            helper.Events.GameLoop.TimeChanged += OnTimeChanged;
+            helper.Events.GameLoop.TimeChanged += OnTownTick;
         }
 
-        private async void OnTimeChanged(object? sender, TimeChangedEventArgs e)
+        private async void OnTownTick(object? sender, TimeChangedEventArgs e) // Changed object sender to object? sender
         {
-            if (!Context.IsWorldReady || Game1.player == null) return;
+            if (!Context.IsWorldReady) return;
 
-            var player = Game1.player;
-            
-            // Package the data up nicely
+            var villagersData = new List<object>();
+
+            foreach (var npc in Utility.getAllCharacters())
+            {
+                if (npc.IsVillager && !npc.IsMonster) // Changed npc.isVillager() to npc.IsVillager()
+                {
+                    villagersData.Add(new
+                    {
+                        npcName = npc.Name,
+                        location = npc.currentLocation?.Name ?? "Unknown",
+                        tileX = npc.TilePoint.X,
+                        tileY = npc.TilePoint.Y
+                    });
+                }
+            }
+
             var payload = new
             {
-                name = player.Name,
-                farmName = player.farmName.Value,
-                location = player.currentLocation?.Name ?? "Unknown",
-                currentStamina = (int)player.Stamina,
-                maxStamina = player.MaxStamina,
-                money = player.Money,
                 timeOfDay = Game1.getTimeOfDayString(Game1.timeOfDay),
-                currentTool = player.CurrentTool?.DisplayName ?? "None"
+                season = Game1.currentSeason,
+                weather = Game1.isRaining ? "Raining" : Game1.isSnowing ? "Snowing" : "Sunny",
+                villagers = villagersData
             };
 
             try
             {
                 var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                await client.PostAsync(NodeServerUrl, content);
+                
+                // Send state AND wait for the AI's direct instructions
+                var response = await client.PostAsync(NodeServerUrl, content);
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    var overrides = Newtonsoft.Json.JsonConvert.DeserializeObject<List<NpcOverride>>(responseString);
+
+                    if (overrides != null)
+                    {
+                        foreach (var choice in overrides)
+                        {
+                            NPC townsperson = Game1.getCharacterFromName(choice.NpcName);
+                            GameLocation targetLocation = Game1.getLocationFromName(choice.TargetLocationName);
+
+                            if (townsperson != null && targetLocation != null)
+                            {
+                                // Injects the movement path into Stardew's pathfinding system
+                                townsperson.controller = new PathFindController(
+                                    townsperson,
+                                    targetLocation,
+                                    new Point(choice.TargetX, choice.TargetY),
+                                    2 // Default to facing down on arrival
+                                );
+                            }
+                        }
+                    }
+                }
             }
             catch (Exception)
             {
-                // Node server might be offline, ignore silently so the game doesn't crash
+                // Fail silently to safeguard gameplay frame rates
             }
         }
+    }
+
+    public class NpcOverride
+    {
+        public string NpcName { get; set; } = "";
+        public string TargetLocationName { get; set; } = "";
+        public int TargetX { get; set; }
+        public int TargetY { get; set; }
     }
 }
